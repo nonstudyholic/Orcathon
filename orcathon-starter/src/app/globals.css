@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 244 246 246;
+  --surface: 255 255 255;
+  --ink: 14 20 23;
+  --muted: 90 104 109;
+  --line: 218 225 226;
+  --accent: 15 118 110;
+  --accent-fg: 255 255 255;
+}
+
+.dark {
+  --bg: 9 13 15;
+  --surface: 16 22 25;
+  --ink: 232 239 239;
+  --muted: 139 156 160;
+  --line: 35 46 50;
+  --accent: 45 212 191;
+  --accent-fg: 5 30 27;
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-bg text-ink antialiased;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-colors
+      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-accent-fg hover:opacity-90;
+  }
+  .btn-ghost {
+    @apply btn border border-line text-ink hover:bg-ink/5;
+  }
+  .btn-danger {
+    @apply btn border border-line text-red-600 hover:bg-red-500/10 dark:text-red-400;
+  }
+  .input {
+    @apply w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted
+      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium;
+  }
+  .card {
+    @apply rounded-lg border border-line bg-surface;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
