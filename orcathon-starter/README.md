@@ -1,10 +1,10 @@
 # Orcathon Starter
 
-A Next.js + Supabase foundation built **before** the hackathon.
+Next.js + Supabase foundation built before the hackathon.
 
 ## Disclosure (pre-existing work)
 
-This repository contained the following **before** the hackathon began (see git tag `pre-hackathon-base`):
+This repository contained the following **before** hackathon began:
 
 - Next.js 15 (App Router) + TypeScript + Tailwind CSS project setup
 - Navbar with auth-aware Log in / Log out and a light/dark theme toggle
@@ -15,14 +15,10 @@ This repository contained the following **before** the hackathon began (see git 
 
 ### Built during the hackathon
 
-> Fill this in during the event. Everything listed here was created after the `pre-hackathon-base` tag.
-
-- (feature 1)
-- (feature 2)
 
 ### Tools and technologies
 
-Next.js, React, TypeScript, Tailwind CSS, Supabase (Postgres, Auth), Vercel, Claude (AI assistance for the pre-built foundation), plus anything you add during the event (e.g. Gemini / OpenAI API).
+Next.js, React, TypeScript, Tailwind CSS, Supabase (Postgres, Auth), Vercel, Claude (AI assistance for the pre-built foundation),etc.
 
 ---
 
