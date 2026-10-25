@@ -9,16 +9,11 @@ This repository contained the following **before** hackathon began:
 - Next.js 15 (App Router) + TypeScript + Tailwind CSS project setup
 - Navbar with auth-aware Log in / Log out and a light/dark theme toggle
 - Supabase email/password auth (sign up, log in, log out, email confirmation callback)
-- Route protection for `/dashboard` via middleware
-- `items` table with Row Level Security, plus full CRUD UI (create form, card grid, edit modal, delete, search and status filter)
-- Vercel deployment configuration
-
-### Built during the hackathon
 
 
 ### Tools and technologies
 
-Next.js, React, TypeScript, Tailwind CSS, Supabase (Postgres, Auth), Vercel, Claude (AI assistance for the pre-built foundation),etc.
+Next.js, React, TypeScript, Tailwind CSS, Supabase (Postgres, Auth), Vercel, Claude (AI assistance for the pre-built foundation and actual foundation), Gemini.
 
 ---
 
