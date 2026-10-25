@@ -13,7 +13,7 @@
   "next": "15.x.x",
   "react": "18.x.x",
   "react-dom": "18.x.x",
-  "openai": "latest"
+  "openai": "latest",
 }
   },
   "devDependencies": {
