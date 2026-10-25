@@ -20,6 +20,9 @@ export default async function Navbar() {
         <div className="flex items-center gap-2">
           {user ? (
             <>
+              <Link href="/dashboard/analyze" className="btn-ghost">
+                Analyze
+              </Link>
               <Link href="/dashboard" className="btn-ghost">
                 Dashboard
               </Link>
