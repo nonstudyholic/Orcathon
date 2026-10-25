@@ -33,6 +33,19 @@ export default function ItemsBoard({ items }: { items: Item[] }) {
     });
   }, [items, query, statusFilter]);
 
+async function handleUserCorrection(itemId: string, correctedClassification: string) {
+  // Update local DB record with user correction for Adaption continuous loop training
+  const response = await fetch("/api/feedback", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ itemId, correction: correctedClassification }),
+  });
+  
+  if (response.ok) {
+    alert("Feedback recorded! Adaption AI model loop updated successfully.");
+  }
+}
+  
   function handleDelete(item: Item) {
     if (!window.confirm(`Delete "${item.title}"? This cannot be undone.`)) return;
     setDeleteError(null);
