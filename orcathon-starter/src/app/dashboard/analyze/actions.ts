@@ -1,25 +1,67 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import type { AnomalyKind, AnomalyOrigin } from "@/types";
+import OpenAI from "openai";
 
-export type AiRegionInput = { id: string; before: string; after: string };
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "" });
 
-export type AiRegionResult = {
-  id: string;
-  kind: AnomalyKind | "no_change";
-  origin: AnomalyOrigin;
-  confidence: number;
-  reason: string;
-};
+export async function generateIncidentReport(formData: FormData) {
+  const supabase = createClient();
+  const file = formData.get("image") as File;
 
-export type AiResponse =
-  | { ok: true; results: AiRegionResult[] }
-  | { ok: false; code: "no_key" | "auth" | "failed"; error: string };
+  if (!file) {
+    return { error: "No satellite image provided." };
+  }
 
-const KINDS = ["forest_loss", "infrastructure_damage", "excavation", "coastal_shift", "unclassified", "no_change"];
-const ORIGINS = ["natural", "human", "unknown"];
+  const bytes = await file.arrayBuffer();
+  const buffer = Buffer.from(bytes);
+  const base64Image = buffer.toString("base64");
 
+  try {
+    // 1. Call OpenAI Multimodal API for Satellite Analysis
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Analyze this satellite image for environmental changes. Classify whether changes are 'Natural' or 'Human-Made' (e.g., illegal mining, urban sprawl, deforestation). Provide bounding box coordinates, a confidence score, and a structured summary incident report.",
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:${file.type};base64,${base64Image}`,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const analysisText = response.choices[0]?.message?.content || "No analysis generated.";
+
+    // 2. Log metadata and results to Supabase PostgreSQL
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    const { error: dbError } = await supabase.from("items").insert({
+      user_id: user?.id,
+      title: `Satellite Scan Report - ${new Date().toLocaleDateString()}`,
+      description: analysisText,
+      status: "completed",
+    });
+
+    if (dbError) {
+      console.error("Supabase logging error:", dbError);
+    }
+
+    return { success: true, report: analysisText };
+  } catch (err: any) {
+    console.error("Incident analysis failed:", err);
+    return { error: err.message || "Failed to process image." };
+  }
+}
 const PROMPT = `You are a remote sensing analyst. Candidate surface changes were found by comparing two satellite images of the same location (before and after). For each region you get a close-up before image and a close-up after image.
 
 For every region decide:
