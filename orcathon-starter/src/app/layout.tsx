@@ -3,6 +3,7 @@ import { Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import { APP_NAME, APP_TAGLINE } from "@/config";
+import { CelestialCursor } from "@/components/CelestialCursor"; // 1. Import the cursor
 
 const sans = Hanken_Grotesk({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -27,7 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className="min-h-screen font-sans">
+      {/* 2. Added starfield-bg and relative here */}
+      <body className="min-h-screen font-sans starfield-bg relative">
+        <CelestialCursor /> {/* 3. Mounted the cursor right here */}
         <Navbar />
         <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">{children}</main>
       </body>
