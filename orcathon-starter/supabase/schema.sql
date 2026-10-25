@@ -1,5 +1,3 @@
--- Run this once in Supabase: SQL Editor -> New query -> Run.
-
 create table if not exists public.items (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid not null default auth.uid() references auth.users (id) on delete cascade,
