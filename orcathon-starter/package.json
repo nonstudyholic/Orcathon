@@ -8,12 +8,12 @@
     "start": "next start"
   },
   "dependencies": {
-  "@supabase/ssr": "^0.x.x",
-  "@supabase/supabase-js": "^2.x.x",
-  "next": "15.x.x",
-  "react": "18.x.x",
-  "react-dom": "18.x.x",
-  "openai": "latest",
+    "@supabase/ssr": "^0.x.x",
+    "@supabase/supabase-js": "^2.x.x",
+    "next": "15.x.x",
+    "react": "18.x.x",
+    "react-dom": "18.x.x",
+    "openai": "latest"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
