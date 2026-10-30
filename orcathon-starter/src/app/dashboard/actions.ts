@@ -5,7 +5,19 @@ import { createClient } from "@/lib/supabase/server";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
-function parseForm(formData: FormData) {
+type ParsedForm =
+  | { error: string }
+  | {
+      values: {
+        title: string;
+        description: string | null;
+        category: string;
+        status: string;
+        metadata: Record<string, unknown>;
+      };
+    };
+
+function parseForm(formData: FormData): ParsedForm {
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return { error: "Add a title before saving." } as const;
 
