@@ -15,9 +15,14 @@ export default async function Home() {
       <p className="mt-4 max-w-xl text-lg text-muted">{APP_TAGLINE}</p>
       <div className="mt-8 flex flex-wrap gap-3">
         {user ? (
-          <Link href="/dashboard" className="btn-primary">
-            Open dashboard
-          </Link>
+          <>
+            <Link href="/dashboard/analyze" className="btn-primary">
+              Open analyzer
+            </Link>
+            <Link href="/dashboard" className="btn-ghost">
+              Scan history
+            </Link>
+          </>
         ) : (
           <>
             <Link href="/login?mode=signup" className="btn-primary">
