@@ -2,25 +2,96 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Color tokens. Light theme is the default; the .dark class (set by the theme
+   toggle) switches to the space palette. */
+:root {
+  --bg: 244 246 246;
+  --surface: 255 255 255;
+  --ink: 14 20 23;
+  --muted: 90 104 109;
+  --line: 218 225 226;
+  --accent: 15 118 110;
+  --accent-fg: 255 255 255;
+}
+
+.dark {
+  --bg: 3 7 18;
+  --surface: 15 23 42;
+  --ink: 241 245 249;
+  --muted: 148 163 184;
+  --line: 30 41 59;
+  --accent: 45 212 191;
+  --accent-fg: 5 30 27;
+}
+
 @layer base {
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
   body {
-    @apply bg-[#030712] text-slate-100 antialiased selection:bg-indigo-500 selection:text-white;
-    background-image: 
-      radial-gradient(ellipse at 50% 0%, rgba(30, 41, 59, 0.5) 0%, transparent 70%),
-      radial-gradient(circle at 80% 20%, rgba(49, 46, 129, 0.15) 0%, transparent 40%);
+    @apply bg-bg text-ink antialiased selection:bg-indigo-500 selection:text-white;
     min-height: 100vh;
     position: relative;
     overflow-x: hidden;
   }
 }
 
-/* Subtle Starfield background pattern */
-.starfield-bg {
-  background-image: 
-    radial-gradient(1px 1px at 20px 30px, #ffffff, rgba(0,0,0,0)),
-    radial-gradient(1.5px 1.5px at 40px 70px, rgba(248, 113, 113, 0.8), rgba(0,0,0,0)),
-    radial-gradient(1px 1px at 90px 40px, #93c5fd, rgba(0,0,0,0)),
-    radial-gradient(2px 2px at 160px 120px, rgba(251, 146, 60, 0.8), rgba(0,0,0,0)),
-    radial-gradient(1px 1px at 200px 250px, #ffffff, rgba(0,0,0,0));
-  background-size: 350px 350px;
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-colors
+      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-accent-fg hover:opacity-90;
+  }
+  .btn-ghost {
+    @apply btn border border-line text-ink hover:bg-ink/5;
+  }
+  .btn-danger {
+    @apply btn border border-line text-red-600 hover:bg-red-500/10 dark:text-red-400;
+  }
+  .input {
+    @apply w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted
+      focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-accent;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium;
+  }
+  .card {
+    @apply rounded-lg border border-line bg-surface;
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+  }
+}
+
+/* Space background: soft glow plus a subtle starfield, dark theme only. */
+.dark body {
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(30, 41, 59, 0.5) 0%, transparent 70%),
+    radial-gradient(circle at 80% 20%, rgba(49, 46, 129, 0.15) 0%, transparent 40%);
+}
+
+.dark .starfield-bg {
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, #ffffff, rgba(0, 0, 0, 0)),
+    radial-gradient(1.5px 1.5px at 40px 70px, rgba(248, 113, 113, 0.8), rgba(0, 0, 0, 0)),
+    radial-gradient(1px 1px at 90px 40px, #93c5fd, rgba(0, 0, 0, 0)),
+    radial-gradient(2px 2px at 160px 120px, rgba(251, 146, 60, 0.8), rgba(0, 0, 0, 0)),
+    radial-gradient(1px 1px at 200px 250px, #ffffff, rgba(0, 0, 0, 0)),
+    radial-gradient(ellipse at 50% 0%, rgba(30, 41, 59, 0.5) 0%, transparent 70%),
+    radial-gradient(circle at 80% 20%, rgba(49, 46, 129, 0.15) 0%, transparent 40%);
+  background-size: 350px 350px, 350px 350px, 350px 350px, 350px 350px, 350px 350px, 100% 100%, 100% 100%;
+  background-repeat: repeat, repeat, repeat, repeat, repeat, no-repeat, no-repeat;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }
