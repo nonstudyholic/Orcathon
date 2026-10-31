@@ -1,15 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { classifyWithAi } from "@/app/dashboard/analyze/actions";
+import { saveScan } from "@/app/dashboard/analyze/save";
 import { classifyByRules } from "@/lib/classifyByRules";
 import { detectChanges, makeRegionCrops, type Sensitivity } from "@/lib/detectChanges";
-import { ANOMALY_KINDS, ORIGIN_STYLES, VIEW_LAYERS, type Anomaly, type ViewLayer } from "@/types";
+import { makeSamplePair } from "@/lib/sampleImages";
+import { ANOMALY_KINDS, ORIGIN_STYLES, VIEW_LAYERS, type Anomaly, type AnomalyKind, type ViewLayer } from "@/types";
 import ComparisonSlider from "./ComparisonSlider";
 import ImageDropzone from "./ImageDropzone";
 
 type Picked = { name: string; url: string } | null;
 type Status = "idle" | "detecting" | "classifying" | "done";
+type SaveState = "idle" | "saving" | "saved" | "error";
 
 // Holds one uploaded image as a temporary browser URL and frees it when replaced.
 function useImageSlot() {
@@ -53,6 +57,11 @@ export default function AnalyzeWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const runId = useRef(0);
 
+  const [sampleLoading, setSampleLoading] = useState(false);
+  const [saveTitle, setSaveTitle] = useState("");
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const ready = Boolean(before && after);
   const busy = status === "detecting" || status === "classifying";
 
@@ -63,6 +72,8 @@ export default function AnalyzeWorkspace() {
     setStatus("idle");
     setNotice(null);
     setError(null);
+    setSaveState("idle");
+    setSaveError(null);
   }, [before?.url, after?.url]);
 
   async function runDetection() {
@@ -72,6 +83,8 @@ export default function AnalyzeWorkspace() {
     setError(null);
     setNotice(null);
     setAnomalies([]);
+    setSaveState("idle");
+    setSaveError(null);
 
     try {
       await new Promise((r) => setTimeout(r, 30)); // let the "Detecting" state paint
@@ -99,7 +112,7 @@ export default function AnalyzeWorkspace() {
         setNotice(
           `${warn}${
             ai.code === "no_key"
-              ? "AI review is off because GEMINI_API_KEY is not set."
+              ? "AI review is off because no OPENAI_API_KEY or GEMINI_API_KEY is set."
               : ai.error
           } Showing rule-based labels, which are rough guesses.`
         );
@@ -155,8 +168,106 @@ export default function AnalyzeWorkspace() {
   const unclearCount = anomalies.length - humanCount - naturalCount;
   const aiReviewed = anomalies.length > 0 && anomalies.every((a) => a.source === "ai");
 
+  const stats = useMemo(() => {
+    if (anomalies.length === 0) return null;
+    const counts = new Map<AnomalyKind, number>();
+    let confidenceSum = 0;
+    let areaSum = 0;
+    for (const a of anomalies) {
+      counts.set(a.kind, (counts.get(a.kind) ?? 0) + 1);
+      confidenceSum += a.confidence;
+      areaSum += (a.box.w * a.box.h) / 100; // percent of the image covered by this box
+    }
+    const byKind = Array.from(counts.entries()).sort((x, y) => y[1] - x[1]);
+    return {
+      byKind,
+      topKind: byKind[0][0],
+      avgConfidence: confidenceSum / anomalies.length,
+      areaPct: Math.min(100, areaSum),
+    };
+  }, [anomalies]);
+
+  const humanPct = anomalies.length > 0 ? Math.round((humanCount / anomalies.length) * 100) : 0;
+  const defaultTitle = `Scan ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+
+  async function loadSample() {
+    setSampleLoading(true);
+    try {
+      const pair = await makeSamplePair();
+      setBefore(pair.before);
+      setAfter(pair.after);
+      setSensitivity("high"); // the demo scene has subtle changes, so look harder
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create the sample images.");
+    } finally {
+      setSampleLoading(false);
+    }
+  }
+
+  async function handleSave() {
+    if (!stats) return;
+    setSaveState("saving");
+    setSaveError(null);
+
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const topLabel = ANOMALY_KINDS[stats.topKind].label;
+    const description =
+      `${anomalies.length} ${anomalies.length === 1 ? "region" : "regions"} flagged: ` +
+      `${humanCount} human-made, ${naturalCount} natural, ${unclearCount} unclear. ` +
+      `Most common change: ${topLabel}. Average confidence ${Math.round(stats.avgConfidence * 100)}%.` +
+      (aiReviewed ? " Labels reviewed by AI." : " Labels are rule-based guesses.");
+
+    const origin = humanCount > 0 && naturalCount > 0 ? "mixed" : humanCount > 0 ? "human" : naturalCount > 0 ? "natural" : "note";
+
+    try {
+      const result = await saveScan({
+        title: saveTitle.trim() || defaultTitle,
+        description,
+        category: stats.topKind,
+        status: origin,
+        metadata: {
+          kind: "scan",
+          sensitivity,
+          beforeImage: before?.name ?? null,
+          afterImage: after?.name ?? null,
+          regionCount: anomalies.length,
+          humanCount,
+          naturalCount,
+          unclearCount,
+          avgConfidence: round2(stats.avgConfidence),
+          areaFlaggedPct: Math.round(stats.areaPct * 10) / 10,
+          aiReviewed,
+          regions: anomalies.map((a) => ({
+            id: a.id,
+            kind: a.kind,
+            origin: a.origin,
+            confidence: round2(a.confidence),
+            reason: a.reason ?? "",
+            box: a.box,
+          })),
+        },
+      });
+      if (!result.ok) {
+        setSaveState("error");
+        setSaveError(result.error);
+        return;
+      }
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
+      setSaveError("Could not save the scan. Check your connection and try again.");
+    }
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted">No images handy? Try the demo scene (forest, river and farm field).</p>
+        <button type="button" onClick={loadSample} disabled={sampleLoading || busy} className="btn-ghost">
+          {sampleLoading ? "Creating samples..." : "Load sample images"}
+        </button>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <ImageDropzone
           label="Before (earlier date)"
@@ -228,6 +339,75 @@ export default function AnalyzeWorkspace() {
             <p role="status" className="rounded-md bg-accent/10 px-4 py-3 text-sm">
               {notice}
             </p>
+          )}
+
+          {stats && (
+            <section aria-label="Scan summary" className="space-y-3">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <StatTile label="Regions flagged" value={String(anomalies.length)} sub={`${naturalCount} natural, ${unclearCount} unclear`} />
+                <StatTile label="Human-made" value={`${humanPct}%`} sub={`${humanCount} of ${anomalies.length} regions`} />
+                <StatTile
+                  label="Average confidence"
+                  value={`${Math.round(stats.avgConfidence * 100)}%`}
+                  sub={aiReviewed ? "AI-reviewed" : "Rule-based guess"}
+                />
+                <StatTile label="Image area flagged" value={`${stats.areaPct.toFixed(1)}%`} sub="approximate" />
+              </div>
+
+              <div className="card space-y-2 p-4">
+                <h2 className="text-sm font-semibold">Types of change</h2>
+                {stats.byKind.map(([kind, count]) => (
+                  <div key={kind} className="flex items-center gap-3 text-sm">
+                    <span className="w-44 shrink-0 truncate">{ANOMALY_KINDS[kind].label}</span>
+                    <span className="h-2 flex-1 overflow-hidden rounded-full bg-ink/10">
+                      <span
+                        className="block h-full rounded-full"
+                        style={{ width: `${(count / anomalies.length) * 100}%`, backgroundColor: ANOMALY_KINDS[kind].color }}
+                      />
+                    </span>
+                    <span className="w-6 text-right text-muted">{count}</span>
+                  </div>
+                ))}
+              </div>
+
+              {status === "done" && (
+                <div className="card flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
+                  <div className="sm:w-80">
+                    <label htmlFor="scan-title" className="label">
+                      Save this scan
+                    </label>
+                    <input
+                      id="scan-title"
+                      value={saveTitle}
+                      onChange={(e) => setSaveTitle(e.target.value)}
+                      placeholder={defaultTitle}
+                      maxLength={200}
+                      disabled={saveState === "saving" || saveState === "saved"}
+                      className="input"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    disabled={saveState === "saving" || saveState === "saved"}
+                    className="btn-primary"
+                  >
+                    {saveState === "saving" ? "Saving..." : saveState === "saved" ? "Saved" : "Save scan"}
+                  </button>
+                  <p className="text-xs text-muted sm:ml-auto sm:max-w-sm" aria-live="polite">
+                    {saveState === "saved" ? (
+                      <>
+                        Saved to your history. <Link href="/dashboard" className="underline underline-offset-4">View history</Link>
+                      </>
+                    ) : saveState === "error" ? (
+                      <span className="text-red-600 dark:text-red-400">{saveError}</span>
+                    ) : (
+                      "Stores the summary and flagged regions (not the images) in your scan history."
+                    )}
+                  </p>
+                </div>
+              )}
+            </section>
           )}
 
           <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
@@ -328,6 +508,16 @@ export default function AnalyzeWorkspace() {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="card p-4">
+      <p className="text-xs text-muted">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
+      {sub && <p className="mt-0.5 text-xs text-muted">{sub}</p>}
     </div>
   );
 }
