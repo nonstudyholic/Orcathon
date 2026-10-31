@@ -85,7 +85,7 @@ export default function ItemForm({
           <label htmlFor="status" className="label">
             Status
           </label>
-          <select id="status" name="status" defaultValue={initial?.status ?? "todo"} className="input">
+          <select id="status" name="status" defaultValue={initial?.status ?? "note"} className="input">
             {STATUSES.map((s) => (
               <option key={s.value} value={s.value}>
                 {s.label}
