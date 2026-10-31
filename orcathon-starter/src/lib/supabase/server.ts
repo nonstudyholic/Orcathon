@@ -1,6 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+// Explicit type so the build does not depend on the installed @supabase/ssr version
+// to infer it.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type CookieToSet = { name: string; value: string; options?: any };
+
 export async function createClient() {
   const cookieStore = await cookies();
 
@@ -12,7 +17,7 @@ export async function createClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: CookieToSet[]) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
