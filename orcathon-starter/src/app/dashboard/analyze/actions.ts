@@ -1,67 +1,38 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import OpenAI from "openai";
+import type { AnomalyKind, AnomalyOrigin } from "@/types";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "" });
+// ---------------------------------------------------------------------------
+// Types and constants
+// ---------------------------------------------------------------------------
 
-export async function generateIncidentReport(formData: FormData) {
-  const supabase = createClient();
-  const file = formData.get("image") as File;
+type AiRegionInput = { id: string; before: string; after: string }; // base64 JPEG, no prefix
 
-  if (!file) {
-    return { error: "No satellite image provided." };
-  }
+type AiRegionResult = {
+  id: string;
+  kind: AnomalyKind | "no_change";
+  origin: AnomalyOrigin;
+  confidence: number;
+  reason: string;
+};
 
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-  const base64Image = buffer.toString("base64");
+type AiResponse =
+  | { ok: true; results: AiRegionResult[] }
+  | { ok: false; code: "auth" | "no_key" | "failed"; error: string };
 
-  try {
-    // 1. Call OpenAI Multimodal API for Satellite Analysis
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Analyze this satellite image for environmental changes. Classify whether changes are 'Natural' or 'Human-Made' (e.g., illegal mining, urban sprawl, deforestation). Provide bounding box coordinates, a confidence score, and a structured summary incident report.",
-            },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${file.type};base64,${base64Image}`,
-              },
-            },
-          ],
-        },
-      ],
-    });
+type Provider = "openai" | "gemini";
 
-    const analysisText = response.choices[0]?.message?.content || "No analysis generated.";
+const KINDS: string[] = [
+  "forest_loss",
+  "infrastructure_damage",
+  "excavation",
+  "coastal_shift",
+  "unclassified",
+  "no_change",
+];
+const ORIGINS: string[] = ["natural", "human", "unknown"];
 
-    // 2. Log metadata and results to Supabase PostgreSQL
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    const { error: dbError } = await supabase.from("items").insert({
-      user_id: user?.id,
-      title: `Satellite Scan Report - ${new Date().toLocaleDateString()}`,
-      description: analysisText,
-      status: "completed",
-    });
-
-    if (dbError) {
-      console.error("Supabase logging error:", dbError);
-    }
-
-    return { success: true, report: analysisText };
-  } catch (err: any) {
-    console.error("Incident analysis failed:", err);
-    return { error: err.message || "Failed to process image." };
-  }
-}
 const PROMPT = `You are a remote sensing analyst. Candidate surface changes were found by comparing two satellite images of the same location (before and after). For each region you get a close-up before image and a close-up after image.
 
 For every region decide:
@@ -73,7 +44,17 @@ For every region decide:
 Respond with JSON only, in exactly this form, with one entry per region:
 {"regions": [{"id": "r1", "kind": "...", "origin": "...", "confidence": 0.0, "reason": "..."}]}`;
 
-type Provider = "openai" | "gemini";
+class HttpError extends Error {
+  status: number;
+  constructor(status: number) {
+    super(`HTTP ${status}`);
+    this.status = status;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Providers
+// ---------------------------------------------------------------------------
 
 async function callOpenAI(list: AiRegionInput[], apiKey: string): Promise<string> {
   const content: object[] = [{ type: "text", text: PROMPT }];
@@ -88,7 +69,7 @@ async function callOpenAI(list: AiRegionInput[], apiKey: string): Promise<string
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL || "gpt-5.4-mini",
+      model: process.env.OPENAI_MODEL || "gpt-4o",
       messages: [{ role: "user", content }],
       response_format: { type: "json_object" },
     }),
@@ -112,7 +93,7 @@ async function callGemini(list: AiRegionInput[], apiKey: string): Promise<string
     parts.push({ inline_data: { mime_type: "image/jpeg", data: r.after } });
   }
 
-  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -131,11 +112,9 @@ async function callGemini(list: AiRegionInput[], apiKey: string): Promise<string
   return (data.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("");
 }
 
-class HttpError extends Error {
-  constructor(public status: number) {
-    super(`HTTP ${status}`);
-  }
-}
+// ---------------------------------------------------------------------------
+// Server action called by AnalyzeWorkspace
+// ---------------------------------------------------------------------------
 
 export async function classifyWithAi(regions: AiRegionInput[]): Promise<AiResponse> {
   const supabase = await createClient();
@@ -145,7 +124,11 @@ export async function classifyWithAi(regions: AiRegionInput[]): Promise<AiRespon
   if (!user) return { ok: false, code: "auth", error: "Your session expired. Log in again." };
 
   // OpenAI is used if its key is set; otherwise Gemini.
-  const provider: Provider | null = process.env.OPENAI_API_KEY ? "openai" : process.env.GEMINI_API_KEY ? "gemini" : null;
+  const provider: Provider | null = process.env.OPENAI_API_KEY
+    ? "openai"
+    : process.env.GEMINI_API_KEY
+      ? "gemini"
+      : null;
   if (!provider) {
     return { ok: false, code: "no_key", error: "No OPENAI_API_KEY or GEMINI_API_KEY is set." };
   }
@@ -193,7 +176,7 @@ export async function classifyWithAi(regions: AiRegionInput[]): Promise<AiRespon
     if (err instanceof HttpError) {
       const msg =
         err.status === 401
-          ? "The AI key was rejected. Check it in .env.local."
+          ? "The AI key was rejected. Check it in your environment variables."
           : err.status === 404
             ? "The AI model name was not found. Check OPENAI_MODEL or GEMINI_MODEL."
             : err.status === 429
