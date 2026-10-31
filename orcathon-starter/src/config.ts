@@ -1,3 +1,3 @@
 // Rename the app in one place.
-export const APP_NAME = "Orcathon Starter";
-export const APP_TAGLINE = "A fast, secure base to build on.";
+export const APP_NAME = "SpacePicsz";
+export const APP_TAGLINE = "Compare satellite images and see what changed.";
