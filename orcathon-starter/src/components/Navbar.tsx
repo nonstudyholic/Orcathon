@@ -19,11 +19,11 @@ export default async function Navbar() {
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              <Link href="/dashboard/analyze" className="btn-ghost">
+              <Link href="/history/analyze" className="btn-ghost">
                 Analyze
               </Link>
-              <Link href="/dashboard" className="btn-ghost">
-                Dashboard
+              <Link href="/history" className="btn-ghost">
+                History
               </Link>
               <span className="hidden max-w-[12rem] truncate text-sm text-muted md:inline" title={user.email}>
                 {user.email}
