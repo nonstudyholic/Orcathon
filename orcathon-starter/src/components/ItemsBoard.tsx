@@ -1,15 +1,30 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { createItem, deleteItem, updateItem } from "@/app/dashboard/actions";
-import { STATUSES, statusLabel, type Item } from "@/types";
+import { ANOMALY_KINDS, STATUSES, statusLabel, type Item } from "@/types";
 import ItemForm from "./ItemForm";
 
 const STATUS_STYLES: Record<string, string> = {
-  todo: "bg-ink/5 text-muted",
-  in_progress: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
-  done: "bg-accent/15 text-accent",
+  human: "bg-red-500/15 text-red-600 dark:text-red-400",
+  natural: "bg-blue-500/15 text-blue-600 dark:text-blue-400",
+  mixed: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+  note: "bg-ink/5 text-muted",
 };
+
+// Reads the summary numbers stored by "Save scan". Returns null for plain notes.
+function scanInfo(item: Item) {
+  const m = item.metadata as Record<string, unknown> | null;
+  if (!m || m.kind !== "scan") return null;
+  const num = (v: unknown) => (typeof v === "number" ? v : null);
+  return {
+    regions: num(m.regionCount),
+    confidence: num(m.avgConfidence),
+    area: num(m.areaFlaggedPct),
+    ai: m.aiReviewed === true,
+  };
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
@@ -33,19 +48,6 @@ export default function ItemsBoard({ items }: { items: Item[] }) {
     });
   }, [items, query, statusFilter]);
 
-async function handleUserCorrection(itemId: string, correctedClassification: string) {
-  // Update local DB record with user correction for Adaption continuous loop training
-  const response = await fetch("/api/feedback", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ itemId, correction: correctedClassification }),
-  });
-  
-  if (response.ok) {
-    alert("Feedback recorded! Adaption AI model loop updated successfully.");
-  }
-}
-  
   function handleDelete(item: Item) {
     if (!window.confirm(`Delete "${item.title}"? This cannot be undone.`)) return;
     setDeleteError(null);
@@ -66,8 +68,8 @@ async function handleUserCorrection(itemId: string, correctedClassification: str
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search items"
-            aria-label="Search items"
+            placeholder="Search scans"
+            aria-label="Search scans"
             className="input"
           />
           <select
@@ -85,15 +87,15 @@ async function handleUserCorrection(itemId: string, correctedClassification: str
           </select>
         </div>
         <button type="button" onClick={() => setShowCreate((v) => !v)} className="btn-primary" aria-expanded={showCreate}>
-          {showCreate ? "Close form" : "New item"}
+          {showCreate ? "Close form" : "Add note"}
         </button>
       </div>
 
       {/* Create form */}
       {showCreate && (
-        <section className="card p-5" aria-label="Create item">
+        <section className="card p-5" aria-label="Add note">
           <ItemForm
-            submitLabel="Create item"
+            submitLabel="Add note"
             resetOnSuccess
             onSubmit={(fd) => createItem(fd)}
             onDone={() => setShowCreate(false)}
@@ -111,23 +113,21 @@ async function handleUserCorrection(itemId: string, correctedClassification: str
       {/* Grid */}
       {items.length === 0 ? (
         <div className="card px-6 py-14 text-center">
-          <p className="font-medium">No items yet</p>
-          <p className="mt-1 text-sm text-muted">Create your first item to see it here.</p>
-          {!showCreate && (
-            <button type="button" onClick={() => setShowCreate(true)} className="btn-primary mt-5">
-              New item
-            </button>
-          )}
+          <p className="font-medium">No saved scans yet</p>
+          <p className="mt-1 text-sm text-muted">Run an analysis and press &ldquo;Save scan&rdquo; to build your history.</p>
+          <Link href="/dashboard/analyze" className="btn-primary mt-5">
+            Open the analyzer
+          </Link>
         </div>
       ) : visible.length === 0 ? (
-        <p className="py-10 text-center text-sm text-muted">No items match your search or filter.</p>
+        <p className="py-10 text-center text-sm text-muted">No scans match your search or filter.</p>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((item) => (
             <li key={item.id} className="card flex flex-col p-5">
               <div className="flex items-start justify-between gap-3">
                 <h2 className="font-semibold leading-snug">{item.title}</h2>
-                <span className={`badge shrink-0 ${STATUS_STYLES[item.status] ?? STATUS_STYLES.todo}`}>
+                <span className={`badge shrink-0 ${STATUS_STYLES[item.status] ?? STATUS_STYLES.note}`}>
                   {statusLabel(item.status)}
                 </span>
               </div>
@@ -136,14 +136,27 @@ async function handleUserCorrection(itemId: string, correctedClassification: str
                 <p className="mt-2 line-clamp-4 whitespace-pre-line text-sm text-muted">{item.description}</p>
               )}
 
-              {/* HACKATHON: render AI output here, e.g. item.metadata.ai_summary */}
+              {(() => {
+                const info = scanInfo(item);
+                if (!info) return null;
+                return (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {info.regions !== null && <span className="badge bg-ink/5 text-muted">{info.regions} regions</span>}
+                    {info.confidence !== null && (
+                      <span className="badge bg-ink/5 text-muted">{Math.round(info.confidence * 100)}% confidence</span>
+                    )}
+                    {info.area !== null && <span className="badge bg-ink/5 text-muted">{info.area}% area</span>}
+                    <span className="badge bg-ink/5 text-muted">{info.ai ? "AI-reviewed" : "Rule-based"}</span>
+                  </div>
+                );
+              })()}
 
               <div className="mt-4 flex items-center justify-between gap-2 pt-1">
                 <p className="text-xs text-muted">
-                  {item.category} &middot; {formatDate(item.created_at)}
+                  {(ANOMALY_KINDS as Record<string, { label: string }>)[item.category]?.label ?? item.category} &middot;{" "}
+                  {formatDate(item.created_at)}
                 </p>
                 <div className="flex gap-2">
-                  {/* HACKATHON: add an "AI summary" button here */}
                   <button type="button" onClick={() => setEditing(item)} className="btn-ghost !px-2.5 !py-1.5">
                     Edit
                   </button>
@@ -164,7 +177,7 @@ async function handleUserCorrection(itemId: string, correctedClassification: str
 
       {/* Edit modal */}
       {editing && (
-        <Modal title="Edit item" onClose={() => setEditing(null)}>
+        <Modal title="Edit entry" onClose={() => setEditing(null)}>
           <ItemForm
             initial={editing}
             submitLabel="Save changes"
