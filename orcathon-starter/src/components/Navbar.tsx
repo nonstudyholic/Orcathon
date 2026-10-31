@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { APP_NAME } from "@/config";
-import ThemeToggle from "./ThemeToggle";
 
 export default async function Navbar() {
   const supabase = await createClient();
@@ -40,7 +39,6 @@ export default async function Navbar() {
               Log in
             </Link>
           )}
-          <ThemeToggle />
         </div>
       </nav>
     </header>
