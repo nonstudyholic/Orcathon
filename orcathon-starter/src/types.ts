@@ -9,14 +9,22 @@ export type Item = {
   created_at: string;
 };
 
-// Change these to fit your hackathon idea. `status` is free text in the database.
+// `status` is free text in the database. For saved scans it records the cause of the changes.
 export const STATUSES = [
-  { value: "todo", label: "To do" },
-  { value: "in_progress", label: "In progress" },
-  { value: "done", label: "Done" },
+  { value: "human", label: "Human-made" },
+  { value: "natural", label: "Natural" },
+  { value: "mixed", label: "Mixed causes" },
+  { value: "note", label: "Note" },
 ] as const;
 
-export const CATEGORY_SUGGESTIONS = ["general", "idea", "task", "resource"];
+export const CATEGORY_SUGGESTIONS = [
+  "general",
+  "forest_loss",
+  "infrastructure_damage",
+  "excavation",
+  "coastal_shift",
+  "unclassified",
+];
 
 export function statusLabel(value: string) {
   return STATUSES.find((s) => s.value === value)?.label ?? value;
